@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mkv-lab"
+version = "0.1.0"
+description = "A toolkit for working with MKV files"
+
+[tool.pyright]
+pythonVersion = "3.10"
+include = ["src", "test"]
+extraPaths = ["src"]
+typeCheckingMode = "basic"
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
