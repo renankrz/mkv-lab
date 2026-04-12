@@ -37,9 +37,10 @@ def streams(filename):
 
 
 if __name__ == "__main__":
+    script_name = os.path.basename(sys.argv[0])
     if len(sys.argv) != 2:
-        print("Usage: python3 streams.py <file>")
-        print("Example: python3 streams.py S01E10.mkv")
+        print(f"Usage: {script_name} <file>")
+        print(f"Example: {script_name} S01E10.mkv")
         sys.exit(1)
 
     filename = sys.argv[1]

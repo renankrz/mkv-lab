@@ -456,9 +456,10 @@ class SubtitleCleaner:
 
 
 def main():
+    script_name = Path(sys.argv[0]).name
     if len(sys.argv) != 2:
-        print("Usage: python clean_subtitles.py <srt_file>")
-        print("Example: python clean_subtitles.py subtitles.srt")
+        print(f"Usage: {script_name} <srt_file>")
+        print(f"Example: {script_name} subtitles.srt")
         sys.exit(1)
 
     file_path = sys.argv[1]
