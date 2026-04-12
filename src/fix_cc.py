@@ -8,27 +8,28 @@ import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Tuple, Set
+from typing import List, Set, Tuple
 
 
 class RegexPatterns:
     """Reusable regex patterns for the entire application."""
 
-    PARENTHESES = re.compile(r'\([^)]*\)')
-    BRACKETS = re.compile(r'\[[^\]]*\]')
-    CURLY_BRACKETS = re.compile(r'\{[^}]*\}')
-    HASH = re.compile(r'#[^#]*#')
-    MUSIC_SIGN = re.compile(r'♪')
-    DOUBLE_HYPHENS = re.compile(r'--')
-    SPEAKER = re.compile(r'^\s*([^:\n]+?)\s*:', re.IGNORECASE)
-    LEADING_DASHES = re.compile(r'^[\-\–\—]')
-    MULTIPLE_SPACES = re.compile(r'\s+')
-    SPACES_BEFORE_PUNCTUATION = re.compile(r'\s+([.,!?;:])')
+    PARENTHESES = re.compile(r"\([^)]*\)")
+    BRACKETS = re.compile(r"\[[^\]]*\]")
+    CURLY_BRACKETS = re.compile(r"\{[^}]*\}")
+    HASH = re.compile(r"#[^#]*#")
+    MUSIC_SIGN = re.compile(r"♪")
+    DOUBLE_HYPHENS = re.compile(r"--")
+    SPEAKER = re.compile(r"^\s*([^:\n]+?)\s*:", re.IGNORECASE)
+    LEADING_DASHES = re.compile(r"^[\-\–\—]")
+    MULTIPLE_SPACES = re.compile(r"\s+")
+    SPACES_BEFORE_PUNCTUATION = re.compile(r"\s+([.,!?;:])")
 
 
 @dataclass
 class SubtitleStructure:
     """Analyzed structure of a subtitle."""
+
     speakers: Set[str] = field(default_factory=set)
     has_dashes: bool = False
     has_parentheses: bool = False
@@ -52,6 +53,7 @@ class SubtitleStructure:
 @dataclass
 class Subtitle:
     """Complete representation of a subtitle."""
+
     number: int
     start_time: str
     end_time: str
@@ -62,7 +64,7 @@ class Subtitle:
 
     def __post_init__(self):
         if not self.lines:
-            self.lines = self.text.split('\n')
+            self.lines = self.text.split("\n")
         if not self.original_text:
             self.original_text = self.text
         # Analyze the structure of the subtitle
@@ -120,14 +122,14 @@ class TextCleaner:
 
         # Applies per-line cleaning steps (speaker identification)
         cleaned_lines = []
-        for line in full_text.split('\n'):
+        for line in full_text.split("\n"):
             cleaned_line = TextCleaner._remove_speaker_identification(line)
             cleaned_line = cleaned_line.strip()
             if cleaned_line:  # Keeps only non-empty lines
                 cleaned_lines.append(cleaned_line)
 
         # Joins the cleaned lines
-        cleaned_text = '\n'.join(cleaned_lines)
+        cleaned_text = "\n".join(cleaned_lines)
 
         # Applies structural formatting based on analysis
         cleaned_text = TextCleaner._format_structure(subtitle, cleaned_text)
@@ -136,45 +138,45 @@ class TextCleaner:
         cleaned_text = TextCleaner._final_cleanup(cleaned_text)
 
         cleaned_subtitle.text = cleaned_text
-        cleaned_subtitle.lines = cleaned_text.split('\n')
+        cleaned_subtitle.lines = cleaned_text.split("\n")
 
         return cleaned_subtitle
 
     @staticmethod
     def _remove_parentheses_content(text: str) -> str:
         """Removes content between parentheses."""
-        return RegexPatterns.PARENTHESES.sub('', text)
+        return RegexPatterns.PARENTHESES.sub("", text)
 
     @staticmethod
     def _remove_bracket_content(text: str) -> str:
         """Removes content between brackets."""
-        return RegexPatterns.BRACKETS.sub('', text)
+        return RegexPatterns.BRACKETS.sub("", text)
 
     @staticmethod
     def _remove_curly_bracket_content(text: str) -> str:
         """Removes content between curly brackets."""
-        return RegexPatterns.CURLY_BRACKETS.sub('', text)
+        return RegexPatterns.CURLY_BRACKETS.sub("", text)
 
     @staticmethod
     def _remove_hash_symbol_content(text: str) -> str:
         """Removes content between hash symbols."""
-        return RegexPatterns.HASH.sub('', text)
+        return RegexPatterns.HASH.sub("", text)
 
     @staticmethod
     def _remove_music_indication(text: str) -> str:
         """Removes musical indication symbols."""
-        return RegexPatterns.MUSIC_SIGN.sub('', text)
+        return RegexPatterns.MUSIC_SIGN.sub("", text)
 
     @staticmethod
     def _fix_double_hyphens(text: str) -> str:
         """Replaces double hyphens with em dash."""
-        return RegexPatterns.DOUBLE_HYPHENS.sub('\u2014', text)
+        return RegexPatterns.DOUBLE_HYPHENS.sub("\u2014", text)
 
     @staticmethod
     def _remove_speaker_identification(text: str) -> str:
         """Removes speaker identification."""
         # Removes only at the beginning of the line to avoid removing dialogues
-        return RegexPatterns.SPEAKER.sub('', text)
+        return RegexPatterns.SPEAKER.sub("", text)
 
     @staticmethod
     def _format_structure(subtitle: Subtitle, cleaned_text: str) -> str:
@@ -182,15 +184,19 @@ class TextCleaner:
         if not cleaned_text.strip():
             return cleaned_text
 
-        cleaned_lines = cleaned_text.split('\n')
+        cleaned_lines = cleaned_text.split("\n")
 
         # DECISION: When to format with dashes?
         should_format = (
-            subtitle.structure.speaker_count > 1 or    # Multiple speakers
-            subtitle.structure.has_dashes or           # Already had dashes
+            subtitle.structure.speaker_count > 1  # Multiple speakers
+            or subtitle.structure.has_dashes  # Already had dashes
+            or
             # Has dashes after cleaning
-            any(RegexPatterns.LEADING_DASHES.match(line.strip())
-                for line in cleaned_lines if line.strip())
+            any(
+                RegexPatterns.LEADING_DASHES.match(line.strip())
+                for line in cleaned_lines
+                if line.strip()
+            )
         )
 
         if not should_format:
@@ -201,18 +207,18 @@ class TextCleaner:
         for line in cleaned_lines:
             stripped = line.strip()
             if not stripped:
-                formatted_lines.append('')
+                formatted_lines.append("")
                 continue
 
             # Removes any residual dash for consistent reformatting
-            cleaned = RegexPatterns.LEADING_DASHES.sub('', stripped)
+            cleaned = RegexPatterns.LEADING_DASHES.sub("", stripped)
 
             if cleaned:
-                formatted_lines.append(f'-{cleaned}')
+                formatted_lines.append(f"-{cleaned}")
             else:
                 formatted_lines.append(stripped)
 
-        return '\n'.join(formatted_lines)
+        return "\n".join(formatted_lines)
 
     @staticmethod
     def _clean_speaker_name(raw_name: str) -> str:
@@ -224,7 +230,7 @@ class TextCleaner:
             TextCleaner._remove_bracket_content,
             TextCleaner._remove_curly_bracket_content,
             TextCleaner._remove_hash_symbol_content,
-            TextCleaner._remove_music_indication
+            TextCleaner._remove_music_indication,
         ]
 
         for cleaner in cleaners:
@@ -235,18 +241,18 @@ class TextCleaner:
     @staticmethod
     def _final_cleanup(text: str) -> str:
         """Final cleanup of the text."""
-        lines = text.split('\n')
+        lines = text.split("\n")
         cleaned_lines = []
 
         for line in lines:
-            line = RegexPatterns.MULTIPLE_SPACES.sub(' ', line)
+            line = RegexPatterns.MULTIPLE_SPACES.sub(" ", line)
             line = line.strip()
-            line = re.sub(r'([\-\–\—])\s+', r'\1', line)
-            line = RegexPatterns.SPACES_BEFORE_PUNCTUATION.sub(r'\1', line)
+            line = re.sub(r"([\-\–\—])\s+", r"\1", line)
+            line = RegexPatterns.SPACES_BEFORE_PUNCTUATION.sub(r"\1", line)
             if line:
                 cleaned_lines.append(line)
 
-        return '\n'.join(cleaned_lines)
+        return "\n".join(cleaned_lines)
 
 
 class SubtitleCleaner:
@@ -259,12 +265,12 @@ class SubtitleCleaner:
     def load_subtitles(self) -> bool:
         """Loads the content of the SRT file."""
         try:
-            with open(self.file_path, 'r', encoding='utf-8') as file:
+            with open(self.file_path, "r", encoding="utf-8") as file:
                 self.original_content = file.readlines()
             return True
         except UnicodeDecodeError:
             try:
-                with open(self.file_path, 'r', encoding='latin-1') as file:
+                with open(self.file_path, "r", encoding="latin-1") as file:
                     self.original_content = file.readlines()
                 return True
             except Exception as e:
@@ -283,17 +289,17 @@ class SubtitleCleaner:
 
         i = 0
         while i < len(self.original_content):
-            line = self.original_content[i].rstrip('\n\r')
+            line = self.original_content[i].rstrip("\n\r")
 
             if not line.strip():
                 if current_number > 0 and current_text_lines:
-                    text = '\n'.join(current_text_lines)
+                    text = "\n".join(current_text_lines)
                     subtitle = Subtitle(
                         number=current_number,
                         start_time=current_start,
                         end_time=current_end,
                         text=text,
-                        lines=current_text_lines.copy()
+                        lines=current_text_lines.copy(),
                     )
                     self.subtitles.append(subtitle)
                     current_text_lines = []
@@ -307,8 +313,8 @@ class SubtitleCleaner:
                 i += 1
                 continue
 
-            if '-->' in line and current_number > 0:
-                times = line.split('-->')
+            if "-->" in line and current_number > 0:
+                times = line.split("-->")
                 if len(times) == 2:
                     current_start = times[0].strip()
                     current_end = times[1].strip()
@@ -323,13 +329,13 @@ class SubtitleCleaner:
             i += 1
 
         if current_number > 0 and current_text_lines:
-            text = '\n'.join(current_text_lines)
+            text = "\n".join(current_text_lines)
             subtitle = Subtitle(
                 number=current_number,
                 start_time=current_start,
                 end_time=current_end,
                 text=text,
-                lines=current_text_lines.copy()
+                lines=current_text_lines.copy(),
             )
             self.subtitles.append(subtitle)
 
@@ -373,27 +379,27 @@ class SubtitleCleaner:
 
             choice = input("\nChoose (1/2/3/4/0): ").strip()
 
-            if choice == '0':
+            if choice == "0":
                 print("Operation cancelled by user.")
                 return False
-            elif choice == '1':
+            elif choice == "1":
                 if will_remove:
                     subtitles_to_remove.append(i)
                     print("✓ Removal accepted")
                 else:
                     changes_made.append((subtitle, cleaned_subtitle))
                     print("✓ Correction accepted")
-            elif choice == '2':
+            elif choice == "2":
                 print("✓ Kept original")
-            elif choice == '3':
+            elif choice == "3":
                 subtitles_to_remove.append(i)
                 print("✓ Subtitle marked for removal")
-            elif choice == '4':
+            elif choice == "4":
                 new_text = input("Enter new text: ").strip()
                 if new_text:
                     new_subtitle = copy.deepcopy(subtitle)
                     new_subtitle.text = new_text
-                    new_subtitle.lines = new_text.split('\n')
+                    new_subtitle.lines = new_text.split("\n")
                     changes_made.append((subtitle, new_subtitle))
                     print("✓ Manual edit saved")
                 else:
@@ -408,9 +414,11 @@ class SubtitleCleaner:
             print("\nNo changes were made.")
             return False
 
-    def apply_changes(self, changes: List[Tuple[Subtitle, Subtitle]], to_remove: List[int]):
+    def apply_changes(
+        self, changes: List[Tuple[Subtitle, Subtitle]], to_remove: List[int]
+    ):
         """Apply changes by creating a new SRT file."""
-        backup_path = self.file_path + '.backup'
+        backup_path = self.file_path + ".backup"
         Path(self.file_path).rename(backup_path)
 
         try:
@@ -430,11 +438,10 @@ class SubtitleCleaner:
             for new_number, subtitle in enumerate(final_subtitles, 1):
                 subtitle.number = new_number
 
-            with open(self.file_path, 'w', encoding='utf-8') as outfile:
+            with open(self.file_path, "w", encoding="utf-8") as outfile:
                 for subtitle in final_subtitles:
                     outfile.write(f"{subtitle.number}\n")
-                    outfile.write(
-                        f"{subtitle.start_time} --> {subtitle.end_time}\n")
+                    outfile.write(f"{subtitle.start_time} --> {subtitle.end_time}\n")
                     outfile.write(f"{subtitle.text}\n")
                     outfile.write("\n")
 

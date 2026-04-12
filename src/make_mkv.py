@@ -3,9 +3,9 @@
 Converts MP4+SRT pairs to MKV with embedded subtitles.
 """
 
-import sys
 import argparse
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -16,16 +16,14 @@ def process_files(input_dir, output_dir):
 
     # Input directory validation
     if not input_path.exists() or not input_path.is_dir():
-        print(
-            f"Error: Input directory '{input_dir}' does not exist or is invalid.")
+        print(f"Error: Input directory '{input_dir}' does not exist or is invalid.")
         sys.exit(1)
 
     # Create output directory
     if not output_path.exists():
         output_path.mkdir(parents=True, exist_ok=True)
     elif not output_path.is_dir():
-        print(
-            f"Error: Output path '{output_dir}' is not a valid directory.")
+        print(f"Error: Output path '{output_dir}' is not a valid directory.")
         sys.exit(1)
 
     # Find MP4 files
@@ -43,29 +41,38 @@ def process_files(input_dir, output_dir):
 
     for i, mp4_file in enumerate(mp4_files, 1):
         # Corresponding SRT file
-        srt_file = mp4_file.with_suffix('.srt')
+        srt_file = mp4_file.with_suffix(".srt")
 
         if not srt_file.exists():
             print(f"{i}. Warning: SRT not found for {mp4_file.name}")
             continue
 
         # Output MKV file
-        mkv_file = output_path / mp4_file.with_suffix('.mkv').name
+        mkv_file = output_path / mp4_file.with_suffix(".mkv").name
 
         # FFmpeg command
         command = [
-            'ffmpeg',
-            '-i', str(mp4_file),
-            '-i', str(srt_file),
-            '-map', '0',
-            '-map', '1',
-            '-c', 'copy',
-            '-c:s', 'srt',
-            '-metadata:s:s:0', 'language=en',
-            '-metadata:s:s:0', 'title=EN',
-            '-disposition:s:0', 'default',
-            '-y',
-            str(mkv_file)
+            "ffmpeg",
+            "-i",
+            str(mp4_file),
+            "-i",
+            str(srt_file),
+            "-map",
+            "0",
+            "-map",
+            "1",
+            "-c",
+            "copy",
+            "-c:s",
+            "srt",
+            "-metadata:s:s:0",
+            "language=en",
+            "-metadata:s:s:0",
+            "title=EN",
+            "-disposition:s:0",
+            "default",
+            "-y",
+            str(mkv_file),
         ]
 
         try:
@@ -84,23 +91,17 @@ def process_files(input_dir, output_dir):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Convert MP4+SRT pairs to MKV with embedded subtitles',
+        description="Convert MP4+SRT pairs to MKV with embedded subtitles",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   %(prog)s ./videos ./converted
   %(prog)s . ./output
-        """
+        """,
     )
 
-    parser.add_argument(
-        'input_dir',
-        help='Input directory with MP4 and SRT files'
-    )
-    parser.add_argument(
-        'output_dir',
-        help='Output directory for MKV files'
-    )
+    parser.add_argument("input_dir", help="Input directory with MP4 and SRT files")
+    parser.add_argument("output_dir", help="Output directory for MKV files")
 
     args = parser.parse_args()
 

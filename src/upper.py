@@ -3,7 +3,6 @@
 Renames files to UPPERCASE, keeping extensions lowercase.
 """
 
-
 import os
 import sys
 
@@ -46,7 +45,6 @@ if __name__ == "__main__":
         print(f"Error: '{directory}' is not a valid directory")
         sys.exit(1)
 
-    print(
-        f"Renaming files in {directory} (keeping extensions lowercase)...")
+    print(f"Renaming files in {directory} (keeping extensions lowercase)...")
     rename_files_to_upper(directory)
     print("Done.")

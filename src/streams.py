@@ -3,33 +3,34 @@
 Lists stream information from media files using FFmpeg.
 """
 
+import os
 import subprocess
 import sys
-import os
 
 
 def streams(filename):
     # Check if the file exists
     if not os.path.isfile(filename):
-        print(
-            f"Error: The file '{filename}' was not found in the current directory.")
+        print(f"Error: The file '{filename}' was not found in the current directory.")
         return 1
 
     # Build the command
-    command = ['ffmpeg', '-hide_banner', '-i', filename]
+    command = ["ffmpeg", "-hide_banner", "-i", filename]
 
     try:
         # Run the command and capture the output
         result = subprocess.run(command, stderr=subprocess.PIPE, text=True)
 
         # Filter lines containing "Stream"
-        for line in result.stderr.split('\n'):
-            if 'Stream' in line:
+        for line in result.stderr.split("\n"):
+            if "Stream" in line:
                 print(line)
 
         return 0
     except FileNotFoundError:
-        print("Error: The command 'ffmpeg' was not found. Make sure FFmpeg is installed.")
+        print(
+            "Error: The command 'ffmpeg' was not found. Make sure FFmpeg is installed."
+        )
         return 1
     except Exception as e:
         print(f"An error occurred: {e}")

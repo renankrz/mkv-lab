@@ -29,7 +29,7 @@ def rename_files(input_dir, names_file, append_mode=True):
 
     # Read names from file
     try:
-        with open(names_path, 'r', encoding='utf-8') as f:
+        with open(names_path, "r", encoding="utf-8") as f:
             names = [line.strip() for line in f.readlines() if line.strip()]
     except Exception as e:
         print(f"Error reading names file: {e}")
@@ -46,7 +46,8 @@ def rename_files(input_dir, names_file, append_mode=True):
     # Check if counts match
     if len(files) != len(names):
         print(
-            f"Error: Number of files ({len(files)}) does not match number of names ({len(names)})!")
+            f"Error: Number of files ({len(files)}) does not match number of names ({len(names)})!"
+        )
         return False
 
     mode = "APPEND" if append_mode else "REPLACE"
@@ -81,7 +82,7 @@ def rename_files(input_dir, names_file, append_mode=True):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Renames files using names from an external file',
+        description="Renames files using names from an external file",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -90,21 +91,18 @@ Examples:
   %(prog)s -a ./photos /path/name_list.txt           (append mode)
 
 The names file must contain one name per line, in the same order as the files.
-        """
+        """,
     )
 
     parser.add_argument(
-        'input_dir',
-        help='Directory containing the files to be renamed'
+        "input_dir", help="Directory containing the files to be renamed"
     )
+    parser.add_argument("names", help="File containing the names (one per line)")
     parser.add_argument(
-        'names',
-        help='File containing the names (one per line)'
-    )
-    parser.add_argument(
-        '-a', '--append',
-        action='store_true',
-        help='Append mode: adds the name to the original (default: replace mode)'
+        "-a",
+        "--append",
+        action="store_true",
+        help="Append mode: adds the name to the original (default: replace mode)",
     )
 
     args = parser.parse_args()

@@ -12,20 +12,20 @@ from pathlib import Path
 def parse_arguments():
     """Parses command line arguments"""
     parser = argparse.ArgumentParser(
-        description='Extracts English subtitles from MKV files, preferring the least polluted ones',
+        description="Extracts English subtitles from MKV files, preferring the least polluted ones",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   %(prog)s ./videos
   %(prog)s ./videos ./subtitles
-        """
+        """,
     )
 
     # Directories
+    parser.add_argument("input_dir", help="Input directory with MKV files")
     parser.add_argument(
-        'input_dir', help='Input directory with MKV files')
-    parser.add_argument(
-        'output_dir', nargs='?', help='Output directory for SRT files (optional)')
+        "output_dir", nargs="?", help="Output directory for SRT files (optional)"
+    )
 
     args = parser.parse_args()
 
@@ -50,15 +50,19 @@ def find_complete_english_subtitle(input_file):
     """
     try:
         cmd = [
-            'ffprobe', '-v', 'error',
-            '-show_entries', 'stream=index:stream_tags=language,title',
-            '-show_entries', 'stream_disposition=forced,hearing_impaired',
-            '-select_streams', 's',
-            input_file
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "stream=index:stream_tags=language,title",
+            "-show_entries",
+            "stream_disposition=forced,hearing_impaired",
+            "-select_streams",
+            "s",
+            input_file,
         ]
 
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         output = result.stdout
 
         subtitle_candidates = []  # List of (index, type, title)
@@ -71,14 +75,24 @@ def find_complete_english_subtitle(input_file):
 
         # Map common language variations
         lang_variations = {
-            'en': ['en', 'eng', 'english', 'en-us', 'en_us', 'enus', 'en-gb', 'en_gb', 'engb']
+            "en": [
+                "en",
+                "eng",
+                "english",
+                "en-us",
+                "en_us",
+                "enus",
+                "en-gb",
+                "en_gb",
+                "engb",
+            ]
         }
 
-        lines = output.split('\n')
+        lines = output.split("\n")
         for line in lines:
             line = line.strip().lower()
 
-            if line.startswith('[stream]'):
+            if line.startswith("[stream]"):
                 # Reset for new stream
                 current_index = None
                 current_lang = None
@@ -86,13 +100,19 @@ def find_complete_english_subtitle(input_file):
                 current_forced = False
                 current_hearing_impaired = False
 
-            elif line.startswith('[/stream]'):
+            elif line.startswith("[/stream]"):
                 # Process complete stream - IGNORE forced subtitles
-                if (current_lang and any(current_lang in lang_variations.get('en', []) for current_lang in [current_lang])
-                        and not current_forced):
+                if (
+                    current_lang
+                    and any(
+                        current_lang in lang_variations.get("en", [])
+                        for current_lang in [current_lang]
+                    )
+                    and not current_forced
+                ):
 
                     # Determine subtitle type based on tags and dispositions
-                    subtitle_type = 'normal'
+                    subtitle_type = "normal"
 
                     # Check if special by title
                     title_special = False
@@ -101,58 +121,66 @@ def find_complete_english_subtitle(input_file):
                         title_lower = current_title.lower()
 
                         # Ignore forced subtitles by title as well
-                        if 'forced' in title_lower:
+                        if "forced" in title_lower:
                             continue  # Skip forced subtitles
-                        if any(tag in title_lower for tag in ['cc', 'caption']):
-                            subtitle_type = 'cc'
-                            special_tags.append('cc')
-                        if any(tag in title_lower for tag in ['sdh', 'hi', 'hearing', 'impaired']):
-                            subtitle_type = 'hi'
-                            special_tags.append('hi')
+                        if any(tag in title_lower for tag in ["cc", "caption"]):
+                            subtitle_type = "cc"
+                            special_tags.append("cc")
+                        if any(
+                            tag in title_lower
+                            for tag in ["sdh", "hi", "hearing", "impaired"]
+                        ):
+                            subtitle_type = "hi"
+                            special_tags.append("hi")
 
                         # Mark as special if there are relevant tags
                         title_special = bool(special_tags)
 
                     # Check dispositions (already ensured not forced above)
-                    if current_hearing_impaired and subtitle_type == 'normal':
-                        subtitle_type = 'hi'
-                        special_tags.append('hi')
+                    if current_hearing_impaired and subtitle_type == "normal":
+                        subtitle_type = "hi"
+                        special_tags.append("hi")
 
                     # Add to candidate list
-                    subtitle_candidates.append({
-                        'index': current_index,
-                        'type': subtitle_type,
-                        'title': current_title,
-                        'special_tags': special_tags,
-                        'hearing_impaired': current_hearing_impaired,
-                        'title_special': title_special
-                    })
+                    subtitle_candidates.append(
+                        {
+                            "index": current_index,
+                            "type": subtitle_type,
+                            "title": current_title,
+                            "special_tags": special_tags,
+                            "hearing_impaired": current_hearing_impaired,
+                            "title_special": title_special,
+                        }
+                    )
 
-            elif line.startswith('index='):
-                current_index = line.split('=')[1]
-            elif line.startswith('tag:language='):
-                current_lang = line.split('=')[1].strip()
-            elif line.startswith('tag:title='):
-                current_title = line.split('=')[1].strip()
-            elif line.startswith('disposition:forced='):
-                current_forced = line.split('=')[1].strip() == '1'
-            elif line.startswith('disposition:hearing_impaired='):
-                current_hearing_impaired = line.split('=')[1].strip() == '1'
+            elif line.startswith("index="):
+                current_index = line.split("=")[1]
+            elif line.startswith("tag:language="):
+                current_lang = line.split("=")[1].strip()
+            elif line.startswith("tag:title="):
+                current_title = line.split("=")[1].strip()
+            elif line.startswith("disposition:forced="):
+                current_forced = line.split("=")[1].strip() == "1"
+            elif line.startswith("disposition:hearing_impaired="):
+                current_hearing_impaired = line.split("=")[1].strip() == "1"
 
         # Preference order: normal > hi > cc > title_special
-        type_priority = {'normal': 0, 'hi': 1, 'cc': 2, 'title_special': 3}
+        type_priority = {"normal": 0, "hi": 1, "cc": 2, "title_special": 3}
 
         # Find the best subtitle based on priority
         best_subtitle = None
         for candidate in subtitle_candidates:
-            candidate_type = candidate['type']
-            if candidate['title_special'] and candidate_type == 'normal':
-                candidate_type = 'title_special'
+            candidate_type = candidate["type"]
+            if candidate["title_special"] and candidate_type == "normal":
+                candidate_type = "title_special"
 
-            if best_subtitle is None or type_priority[candidate_type] < type_priority[best_subtitle['type']]:
+            if (
+                best_subtitle is None
+                or type_priority[candidate_type] < type_priority[best_subtitle["type"]]
+            ):
                 best_subtitle = candidate
 
-        return best_subtitle['index'] if best_subtitle else None
+        return best_subtitle["index"] if best_subtitle else None
 
     except subprocess.CalledProcessError:
         return None
@@ -166,15 +194,20 @@ def extract_subtitle(input_file, output_file, subtitle_index, file_index):
     try:
         # Build ffmpeg command
         ffmpeg_cmd = [
-            'ffmpeg', '-i', input_file,
-            '-map', f'0:{subtitle_index}',
-            '-c', 'srt',
-            str(output_file)
+            "ffmpeg",
+            "-i",
+            input_file,
+            "-map",
+            f"0:{subtitle_index}",
+            "-c",
+            "srt",
+            str(output_file),
         ]
 
         # Run conversion
-        subprocess.run(ffmpeg_cmd, stdout=subprocess.DEVNULL,
-                       stderr=subprocess.DEVNULL, check=True)
+        subprocess.run(
+            ffmpeg_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
+        )
 
         print(f"{file_index}. {file_name} [OK]")
         return True
@@ -195,10 +228,18 @@ def main():
     """Main function"""
     # Check dependencies
     try:
-        subprocess.run(['ffmpeg', '-version'], stdout=subprocess.DEVNULL,
-                       stderr=subprocess.DEVNULL, check=True)
-        subprocess.run(['ffprobe', '-version'], stdout=subprocess.DEVNULL,
-                       stderr=subprocess.DEVNULL, check=True)
+        subprocess.run(
+            ["ffmpeg", "-version"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        )
+        subprocess.run(
+            ["ffprobe", "-version"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        )
     except (subprocess.CalledProcessError, FileNotFoundError):
         print("Error: Please install ffmpeg and ffprobe: sudo apt install ffmpeg")
         sys.exit(1)
@@ -214,7 +255,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Process files
-    mkv_files = sorted(input_dir.glob('*.mkv'))
+    mkv_files = sorted(input_dir.glob("*.mkv"))
 
     if not mkv_files:
         print("No MKV files found.")
@@ -237,8 +278,7 @@ def main():
         if extract_subtitle(str(mkv_file), output_file, subtitle_index, i):
             success_count += 1
 
-    print(
-        f"Processing complete! {success_count}/{len(mkv_files)} file(s) processed.")
+    print(f"Processing complete! {success_count}/{len(mkv_files)} file(s) processed.")
 
 
 if __name__ == "__main__":
