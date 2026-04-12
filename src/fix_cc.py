@@ -73,6 +73,18 @@ class Subtitle:
         """Analyzes the structure of the subtitle for decision making."""
         self.structure.line_count = len(self.lines)
 
+        # Checks content patterns on the full text (multiline-aware)
+        if RegexPatterns.PARENTHESES.search(self.text):
+            self.structure.has_parentheses = True
+        if RegexPatterns.BRACKETS.search(self.text):
+            self.structure.has_brackets = True
+        if RegexPatterns.CURLY_BRACKETS.search(self.text):
+            self.structure.has_curly_brackets = True
+        if RegexPatterns.HASH.search(self.text):
+            self.structure.has_hash_content = True
+        if '♪' in self.text:
+            self.structure.has_music = True
+
         for line in self.lines:
             line_stripped = line.strip()
 
@@ -85,17 +97,6 @@ class Subtitle:
                 if speaker_name:  # Only adds if something remains after cleaning
                     self.structure.speakers.add(speaker_name)
 
-            # Checks other structural patterns using reusable patterns
-            if RegexPatterns.PARENTHESES.search(line_stripped):
-                self.structure.has_parentheses = True
-            if RegexPatterns.BRACKETS.search(line_stripped):
-                self.structure.has_brackets = True
-            if RegexPatterns.CURLY_BRACKETS.search(line_stripped):
-                self.structure.has_curly_brackets = True
-            if RegexPatterns.HASH.search(line_stripped):
-                self.structure.has_hash_content = True
-            if '♪' in line_stripped:
-                self.structure.has_music = True
             if RegexPatterns.LEADING_DASHES.match(line_stripped):
                 self.structure.has_dashes = True
 
@@ -109,11 +110,20 @@ class TextCleaner:
         # Creates a copy to avoid modifying the original
         cleaned_subtitle = copy.deepcopy(subtitle)
 
-        # Applies basic cleaning steps
+        # Applies content removal on the full text (multiline-aware)
+        full_text = subtitle.text
+        full_text = TextCleaner._remove_parentheses_content(full_text)
+        full_text = TextCleaner._remove_bracket_content(full_text)
+        full_text = TextCleaner._remove_curly_bracket_content(full_text)
+        full_text = TextCleaner._remove_hash_symbol_content(full_text)
+        full_text = TextCleaner._remove_music_indication(full_text)
+
+        # Applies per-line cleaning steps (speaker identification)
         cleaned_lines = []
-        for line in subtitle.lines:
-            cleaned_line = TextCleaner._clean_line(line)
-            if cleaned_line.strip():  # Keeps only non-empty lines
+        for line in full_text.split('\n'):
+            cleaned_line = TextCleaner._remove_speaker_identification(line)
+            cleaned_line = cleaned_line.strip()
+            if cleaned_line:  # Keeps only non-empty lines
                 cleaned_lines.append(cleaned_line)
 
         # Joins the cleaned lines
@@ -129,26 +139,6 @@ class TextCleaner:
         cleaned_subtitle.lines = cleaned_text.split('\n')
 
         return cleaned_subtitle
-
-    @staticmethod
-    def _clean_line(line: str) -> str:
-        """Cleans a single line of text."""
-        cleaned = line
-
-        # Removes different types of special content using reusable patterns
-        cleaners = [
-            TextCleaner._remove_parentheses_content,
-            TextCleaner._remove_bracket_content,
-            TextCleaner._remove_curly_bracket_content,
-            TextCleaner._remove_hash_symbol_content,
-            TextCleaner._remove_music_indication,
-            TextCleaner._remove_speaker_identification
-        ]
-
-        for cleaner in cleaners:
-            cleaned = cleaner(cleaned)
-
-        return cleaned.strip()
 
     @staticmethod
     def _remove_parentheses_content(text: str) -> str:

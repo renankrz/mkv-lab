@@ -341,6 +341,88 @@ class TestSubtitleCleaner:
         )
         assert "SHELDON" in subtitle.structure.speakers
 
+    # -----------------------------------------------
+    # Multiline pattern tests (patterns across lines)
+    # -----------------------------------------------
+
+    def test_clean_subtitle_multiline_parentheses_full_removal(self):
+        subtitle = Subtitle(
+            number=1,
+            start_time="00:00:01,000",
+            end_time="00:00:03,000",
+            text='(2001: A SPACE ODYSSEY\'S "MAIN TITLE"\nPLAYS OVER SPEAKERS)',
+        )
+        result = TextCleaner.clean_subtitle(subtitle)
+        assert result.text == ""
+
+    def test_clean_subtitle_multiline_parentheses_partial(self):
+        subtitle = Subtitle(
+            number=1,
+            start_time="00:00:01,000",
+            end_time="00:00:03,000",
+            text="Hello (this spans\ntwo lines) world.",
+        )
+        result = TextCleaner.clean_subtitle(subtitle)
+        assert result.text == "Hello world."
+
+    def test_clean_subtitle_multiline_brackets_full_removal(self):
+        subtitle = Subtitle(
+            number=1,
+            start_time="00:00:01,000",
+            end_time="00:00:03,000",
+            text="[DRAMATIC MUSIC\nPLAYING]",
+        )
+        result = TextCleaner.clean_subtitle(subtitle)
+        assert result.text == ""
+
+    def test_clean_subtitle_multiline_brackets_partial(self):
+        subtitle = Subtitle(
+            number=1,
+            start_time="00:00:01,000",
+            end_time="00:00:03,000",
+            text="Hello [this spans\ntwo lines] world.",
+        )
+        result = TextCleaner.clean_subtitle(subtitle)
+        assert result.text == "Hello world."
+
+    def test_clean_subtitle_multiline_curly_brackets_full_removal(self):
+        subtitle = Subtitle(
+            number=1,
+            start_time="00:00:01,000",
+            end_time="00:00:03,000",
+            text="{DRAMATIC MUSIC\nPLAYING}",
+        )
+        result = TextCleaner.clean_subtitle(subtitle)
+        assert result.text == ""
+
+    def test_clean_subtitle_multiline_parentheses_with_text_after(self):
+        subtitle = Subtitle(
+            number=1,
+            start_time="00:00:01,000",
+            end_time="00:00:03,000",
+            text="(WHISPERING)\nHow are you?",
+        )
+        result = TextCleaner.clean_subtitle(subtitle)
+        assert result.text == "How are you?"
+
+    def test_structure_detects_multiline_parentheses(self):
+        subtitle = Subtitle(
+            number=1,
+            start_time="00:00:01,000",
+            end_time="00:00:03,000",
+            text='(2001: A SPACE ODYSSEY\'S "MAIN TITLE"\nPLAYS OVER SPEAKERS)',
+        )
+        assert subtitle.structure.has_parentheses
+
+    def test_structure_detects_multiline_brackets(self):
+        subtitle = Subtitle(
+            number=1,
+            start_time="00:00:01,000",
+            end_time="00:00:03,000",
+            text="[DRAMATIC MUSIC\nPLAYING]",
+        )
+        assert subtitle.structure.has_brackets
+
     # --------------------------------------
     # Integration tests (complete cleaning)
     # --------------------------------------
