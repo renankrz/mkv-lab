@@ -14,14 +14,12 @@ from typing import List, Tuple, Set
 class RegexPatterns:
     """Reusable regex patterns for the entire application."""
 
-    # Patterns for content
     PARENTHESES = re.compile(r'\([^)]*\)')
     BRACKETS = re.compile(r'\[[^\]]*\]')
     CURLY_BRACKETS = re.compile(r'\{[^}]*\}')
     HASH = re.compile(r'#[^#]*#')
+    DOUBLE_HYPHENS = re.compile(r'--')
     SPEAKER = re.compile(r'^\s*([^:\n]+?)\s*:', re.IGNORECASE)
-
-    # Patterns for cleaning
     LEADING_DASHES = re.compile(r'^[\-\–\—]')
     MULTIPLE_SPACES = re.compile(r'\s+')
     SPACES_BEFORE_PUNCTUATION = re.compile(r'\s+([.,!?;:])')
@@ -117,6 +115,7 @@ class TextCleaner:
         full_text = TextCleaner._remove_curly_bracket_content(full_text)
         full_text = TextCleaner._remove_hash_symbol_content(full_text)
         full_text = TextCleaner._remove_music_indication(full_text)
+        full_text = TextCleaner._fix_double_hyphens(full_text)
 
         # Applies per-line cleaning steps (speaker identification)
         cleaned_lines = []
@@ -164,6 +163,11 @@ class TextCleaner:
     def _remove_music_indication(text: str) -> str:
         """Removes musical indication symbols."""
         return text.replace('♪', '')
+
+    @staticmethod
+    def _fix_double_hyphens(text: str) -> str:
+        """Replaces double hyphens with em dash."""
+        return RegexPatterns.DOUBLE_HYPHENS.sub('\u2014', text)
 
     @staticmethod
     def _remove_speaker_identification(text: str) -> str:

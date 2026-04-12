@@ -86,6 +86,21 @@ class TestSubtitleCleaner:
         assert TextCleaner._remove_music_indication("♪♪") == ""
         assert TextCleaner._remove_music_indication("♪") == ""
 
+    def test_replace_double_hyphens(self):
+        assert TextCleaner._fix_double_hyphens(
+            "It wasn't--") == "It wasn't\u2014"
+        assert TextCleaner._fix_double_hyphens(
+            "It was not--") == "It was not\u2014"
+        assert TextCleaner._fix_double_hyphens(
+            "Wait-- no--") == "Wait\u2014 no\u2014"
+        assert TextCleaner._fix_double_hyphens(
+            "Hello world") == "Hello world"
+        assert TextCleaner._fix_double_hyphens(
+            "single-hyphen") == "single-hyphen"
+        assert TextCleaner._fix_double_hyphens(
+            "It wasn't-- It was not--\nYou are a nutcase.") == \
+            "It wasn't\u2014 It was not\u2014\nYou are a nutcase."
+
     def test_remove_speaker_identification(self):
         assert TextCleaner._remove_speaker_identification(
             "PERSON: How are you?") == " How are you?"
@@ -583,3 +598,32 @@ class TestSubtitleCleaner:
         )
         result = TextCleaner.clean_subtitle(subtitle)
         assert result.text == ""
+    def test_clean_subtitle_double_hyphens_end_of_line(self):
+        subtitle = Subtitle(
+            number=1,
+            start_time="00:00:01,000",
+            end_time="00:00:03,000",
+            text="It wasn't-- It was not--\nYou are a nutcase.",
+        )
+        result = TextCleaner.clean_subtitle(subtitle)
+        assert result.text == "It wasn't\u2014It was not\u2014\nYou are a nutcase."
+
+    def test_clean_subtitle_double_hyphens_single_line(self):
+        subtitle = Subtitle(
+            number=1,
+            start_time="00:00:01,000",
+            end_time="00:00:03,000",
+            text="Wait-- no, I didn't mean--",
+        )
+        result = TextCleaner.clean_subtitle(subtitle)
+        assert result.text == "Wait\u2014no, I didn't mean\u2014"
+
+    def test_clean_subtitle_double_hyphens_with_speaker(self):
+        subtitle = Subtitle(
+            number=1,
+            start_time="00:00:01,000",
+            end_time="00:00:03,000",
+            text="JOHN: I was just--\nMARY: Don't even start.",
+        )
+        result = TextCleaner.clean_subtitle(subtitle)
+        assert result.text == "-I was just\u2014\n-Don't even start."
