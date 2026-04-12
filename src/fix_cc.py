@@ -18,6 +18,7 @@ class RegexPatterns:
     BRACKETS = re.compile(r'\[[^\]]*\]')
     CURLY_BRACKETS = re.compile(r'\{[^}]*\}')
     HASH = re.compile(r'#[^#]*#')
+    MUSIC_SIGN = re.compile(r'♪')
     DOUBLE_HYPHENS = re.compile(r'--')
     SPEAKER = re.compile(r'^\s*([^:\n]+?)\s*:', re.IGNORECASE)
     LEADING_DASHES = re.compile(r'^[\-\–\—]')
@@ -80,7 +81,7 @@ class Subtitle:
             self.structure.has_curly_brackets = True
         if RegexPatterns.HASH.search(self.text):
             self.structure.has_hash_content = True
-        if '♪' in self.text:
+        if RegexPatterns.MUSIC_SIGN.search(self.text):
             self.structure.has_music = True
 
         for line in self.lines:
@@ -162,7 +163,7 @@ class TextCleaner:
     @staticmethod
     def _remove_music_indication(text: str) -> str:
         """Removes musical indication symbols."""
-        return text.replace('♪', '')
+        return RegexPatterns.MUSIC_SIGN.sub('', text)
 
     @staticmethod
     def _fix_double_hyphens(text: str) -> str:
