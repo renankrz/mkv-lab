@@ -339,6 +339,17 @@ class SubtitleCleaner:
             )
             self.subtitles.append(subtitle)
 
+    @staticmethod
+    def _prompt_edit_lines(lines: List[str]) -> str:
+        """Prompts the user to edit each line of a subtitle individually."""
+        edited_lines = []
+        for i, line in enumerate(lines, 1):
+            print(f"  Line {i} current: {line}")
+            new_line = input(f"  Line {i} new: ").strip()
+            if new_line:
+                edited_lines.append(new_line)
+        return "\n".join(edited_lines)
+
     def process_interactively(self):
         """Interactively process subtitles with the user."""
         changes_made = []
@@ -395,7 +406,7 @@ class SubtitleCleaner:
                 subtitles_to_remove.append(i)
                 print("✓ Subtitle marked for removal")
             elif choice == "4":
-                new_text = input("Enter new text: ").strip()
+                new_text = self._prompt_edit_lines(subtitle.lines)
                 if new_text:
                     new_subtitle = copy.deepcopy(subtitle)
                     new_subtitle.text = new_text
