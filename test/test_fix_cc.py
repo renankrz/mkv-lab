@@ -1,4 +1,4 @@
-from fix_cc import Subtitle, TextCleaner
+from src.fix_cc import Subtitle, TextCleaner
 
 
 class TestSubtitleCleaner:
