@@ -105,6 +105,30 @@ class TestSubtitleCleaner:
             == "It wasn't\u2014 It was not\u2014\nYou are a nutcase."
         )
 
+    def test_fix_lengthy_ellipsis(self):
+        assert (
+            TextCleaner._fix_lengthy_ellipsis("Leslie Winkle....") == "Leslie Winkle..."
+        )
+        assert (
+            TextCleaner._fix_lengthy_ellipsis("Leslie Winkle.....")
+            == "Leslie Winkle..."
+        )
+        assert (
+            TextCleaner._fix_lengthy_ellipsis("Leslie Winkle......")
+            == "Leslie Winkle..."
+        )
+        assert TextCleaner._fix_lengthy_ellipsis("Hello world...") == "Hello world..."
+        assert TextCleaner._fix_lengthy_ellipsis("Hello world..") == "Hello world.."
+        assert TextCleaner._fix_lengthy_ellipsis("Hello world.") == "Hello world."
+        assert TextCleaner._fix_lengthy_ellipsis("Hello world") == "Hello world"
+        assert TextCleaner._fix_lengthy_ellipsis("Wait.... no....") == "Wait... no..."
+        assert (
+            TextCleaner._fix_lengthy_ellipsis(
+                "There was, uh, Joyce Kim,\nLeslie Winkle...."
+            )
+            == "There was, uh, Joyce Kim,\nLeslie Winkle..."
+        )
+
     def test_remove_speaker_identification(self):
         assert (
             TextCleaner._remove_speaker_identification("PERSON: How are you?")
@@ -709,3 +733,43 @@ class TestSubtitleCleaner:
         )
         result = TextCleaner.clean_subtitle(subtitle)
         assert result.text == "-I was just\u2014\n-Don't even start."
+
+    def test_clean_subtitle_lengthy_ellipsis_end_of_line(self):
+        subtitle = Subtitle(
+            number=1,
+            start_time="00:00:01,000",
+            end_time="00:00:03,000",
+            text="There was, uh, Joyce Kim,\nLeslie Winkle....",
+        )
+        result = TextCleaner.clean_subtitle(subtitle)
+        assert result.text == "There was, uh, Joyce Kim,\nLeslie Winkle..."
+
+    def test_clean_subtitle_lengthy_ellipsis_single_line(self):
+        subtitle = Subtitle(
+            number=1,
+            start_time="00:00:01,000",
+            end_time="00:00:03,000",
+            text="Wait.... no, I didn't mean.....",
+        )
+        result = TextCleaner.clean_subtitle(subtitle)
+        assert result.text == "Wait... no, I didn't mean..."
+
+    def test_clean_subtitle_lengthy_ellipsis_with_speaker(self):
+        subtitle = Subtitle(
+            number=1,
+            start_time="00:00:01,000",
+            end_time="00:00:03,000",
+            text="JOHN: I was just....\nMARY: Don't even start.....",
+        )
+        result = TextCleaner.clean_subtitle(subtitle)
+        assert result.text == "-I was just...\n-Don't even start..."
+
+    def test_clean_subtitle_lengthy_ellipsis_with_double_hyphens(self):
+        subtitle = Subtitle(
+            number=1,
+            start_time="00:00:01,000",
+            end_time="00:00:03,000",
+            text="It wasn't-- Joyce Kim,\nLeslie Winkle....",
+        )
+        result = TextCleaner.clean_subtitle(subtitle)
+        assert result.text == "It wasn't\u2014Joyce Kim,\nLeslie Winkle..."

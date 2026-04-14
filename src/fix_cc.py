@@ -20,6 +20,7 @@ class RegexPatterns:
     HASH = re.compile(r"#[^#]*#")
     MUSIC_SIGN = re.compile(r"♪")
     DOUBLE_HYPHENS = re.compile(r"--")
+    LENGTHY_ELLIPSIS = re.compile(r"\.{4,}")
     SPEAKER = re.compile(r"^\s*([^:\n]+?)\s*:", re.IGNORECASE)
     LEADING_DASHES = re.compile(r"^[\-\–\—]")
     MULTIPLE_SPACES = re.compile(r"\s+")
@@ -119,6 +120,7 @@ class TextCleaner:
         full_text = TextCleaner._remove_hash_symbol_content(full_text)
         full_text = TextCleaner._remove_music_indication(full_text)
         full_text = TextCleaner._fix_double_hyphens(full_text)
+        full_text = TextCleaner._fix_lengthy_ellipsis(full_text)
 
         # Applies per-line cleaning steps (speaker identification)
         cleaned_lines = []
@@ -171,6 +173,11 @@ class TextCleaner:
     def _fix_double_hyphens(text: str) -> str:
         """Replaces double hyphens with em dash."""
         return RegexPatterns.DOUBLE_HYPHENS.sub("\u2014", text)
+
+    @staticmethod
+    def _fix_lengthy_ellipsis(text: str) -> str:
+        """Replaces sequences of more than 3 dots with exactly 3 dots."""
+        return RegexPatterns.LENGTHY_ELLIPSIS.sub("...", text)
 
     @staticmethod
     def _remove_speaker_identification(text: str) -> str:
