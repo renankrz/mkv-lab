@@ -365,15 +365,17 @@ class SubtitleCleaner:
         print(f"\nAnalyzing {len(self.subtitles)} subtitles...")
         print("=" * 60)
 
-        for i, subtitle in enumerate(self.subtitles):
-            cleaned_subtitle = self.text_cleaner.clean_subtitle(subtitle)
+        pending = [
+            (i, subtitle, cleaned)
+            for i, subtitle in enumerate(self.subtitles)
+            if (cleaned := self.text_cleaner.clean_subtitle(subtitle)).text
+            != subtitle.text
+        ]
 
-            # Skip if there were no changes
-
-            if cleaned_subtitle.text == subtitle.text:
-                continue
-
-            print(f"\n-------------- Subtitle #{subtitle.number} --------------")
+        for count, (i, subtitle, cleaned_subtitle) in enumerate(pending, 1):
+            print(
+                f"\n-------------- Subtitle #{subtitle.number} ({count}/{len(pending)}) --------------"
+            )
             print(subtitle.text)
 
             # Determine if the correction results in empty text
