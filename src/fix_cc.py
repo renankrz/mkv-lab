@@ -430,13 +430,13 @@ class SubtitleCleaner:
             will_remove = not cleaned_subtitle.text.strip()
 
             if will_remove:
-                print(f"\n-----------------------------------------")
-                print(f"⚠️  REMOVE SUBTITLE")
-                print(f"-----------------------------------------")
+                print("-----------------------------------------")
+                print("⚠️  REMOVE SUBTITLE")
+                print("-----------------------------------------")
             else:
-                print(f"\n-----------------------------------------")
-                print(f"{cleaned_subtitle.text}")
-                print(f"-----------------------------------------")
+                print("-----------------------------------------")
+                print(cleaned_subtitle.text)
+                print("-----------------------------------------")
 
             print("\nOptions:")
             print("1 - Accept correction")
@@ -484,9 +484,9 @@ class SubtitleCleaner:
             for original, auto in auto_changes:
                 print(f"\n-------------- Subtitle #{original.number} --------------")
                 print(original.text)
-                print(f"\n-----------------------------------------")
+                print("-----------------------------------------")
                 print(auto.text)
-                print(f"-----------------------------------------")
+                print("-----------------------------------------")
 
         if changes_made or subtitles_to_remove:
             self.apply_changes(changes_made, subtitles_to_remove)
