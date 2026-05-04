@@ -7,24 +7,54 @@ import copy
 import re
 import sys
 from dataclasses import dataclass, field
+from enum import Enum
+from enum import auto as enum_auto
 from pathlib import Path
-from typing import List, Set, Tuple
+from typing import List, Optional, Set, Tuple
 
 
-class RegexPatterns:
-    """Reusable regex patterns for the entire application."""
+class PatternMode(Enum):
+    """Processing mode for a regex pattern."""
 
-    PARENTHESES = re.compile(r"\([^)]*\)")
-    BRACKETS = re.compile(r"\[[^\]]*\]")
-    CURLY_BRACKETS = re.compile(r"\{[^}]*\}")
-    HASH = re.compile(r"#[^#]*#")
-    MUSIC_SIGN = re.compile(r"♪")
-    DOUBLE_HYPHENS = re.compile(r"--")
-    LENGTHY_ELLIPSIS = re.compile(r"\.{4,}")
-    SPEAKER = re.compile(r"^\s*([^:\n]+?)\s*:", re.IGNORECASE)
-    LEADING_DASHES = re.compile(r"^[\-\–\—]")
-    MULTIPLE_SPACES = re.compile(r"\s+")
-    SPACES_BEFORE_PUNCTUATION = re.compile(r"\s+([.,!?;:])")
+    AUTO = enum_auto()
+    INTERACTIVE = enum_auto()
+
+
+@dataclass
+class Pattern:
+    """A regex pattern paired with its processing mode."""
+
+    regex: re.Pattern
+    mode: PatternMode
+
+    def search(self, string: str) -> Optional[re.Match[str]]:
+        return self.regex.search(string)
+
+    def sub(self, repl: str, string: str, count: int = 0) -> str:
+        return self.regex.sub(repl, string, count)
+
+    def match(self, string: str) -> Optional[re.Match[str]]:
+        return self.regex.match(string)
+
+
+class Patterns:
+    """Padrões nomeados usados pela aplicação, cada um associado ao seu modo de processamento."""
+
+    PARENTHESES = Pattern(re.compile(r"\([^)]*\)"), PatternMode.INTERACTIVE)
+    BRACKETS = Pattern(re.compile(r"\[[^\]]*\]"), PatternMode.INTERACTIVE)
+    CURLY_BRACKETS = Pattern(re.compile(r"\{[^}]*\}"), PatternMode.INTERACTIVE)
+    HASH = Pattern(re.compile(r"#[^#]*#"), PatternMode.INTERACTIVE)
+    MUSIC_SIGN = Pattern(re.compile(r"♪"), PatternMode.INTERACTIVE)
+    DOUBLE_HYPHENS = Pattern(re.compile(r"--"), PatternMode.INTERACTIVE)
+    LENGTHY_ELLIPSIS = Pattern(re.compile(r"\.{4,}"), PatternMode.AUTO)
+    SPEAKER = Pattern(
+        re.compile(r"^\s*([^:\n]+?)\s*:", re.IGNORECASE), PatternMode.INTERACTIVE
+    )
+    LEADING_DASHES = Pattern(re.compile(r"^[\-\–\—]"), PatternMode.INTERACTIVE)
+    MULTIPLE_SPACES = Pattern(re.compile(r"\s+"), PatternMode.INTERACTIVE)
+    SPACES_BEFORE_PUNCTUATION = Pattern(
+        re.compile(r"\s+([.,!?;:])"), PatternMode.INTERACTIVE
+    )
 
 
 @dataclass
@@ -76,22 +106,22 @@ class Subtitle:
         self.structure.line_count = len(self.lines)
 
         # Checks content patterns on the full text (multiline-aware)
-        if RegexPatterns.PARENTHESES.search(self.text):
+        if Patterns.PARENTHESES.search(self.text):
             self.structure.has_parentheses = True
-        if RegexPatterns.BRACKETS.search(self.text):
+        if Patterns.BRACKETS.search(self.text):
             self.structure.has_brackets = True
-        if RegexPatterns.CURLY_BRACKETS.search(self.text):
+        if Patterns.CURLY_BRACKETS.search(self.text):
             self.structure.has_curly_brackets = True
-        if RegexPatterns.HASH.search(self.text):
+        if Patterns.HASH.search(self.text):
             self.structure.has_hash_content = True
-        if RegexPatterns.MUSIC_SIGN.search(self.text):
+        if Patterns.MUSIC_SIGN.search(self.text):
             self.structure.has_music = True
 
         for line in self.lines:
             line_stripped = line.strip()
 
             # Checks for speaker identification
-            speaker_match = RegexPatterns.SPEAKER.match(line_stripped)
+            speaker_match = Patterns.SPEAKER.match(line_stripped)
             if speaker_match:
                 raw_speaker = speaker_match.group(1).strip()
                 # Cleans the speaker name by removing CC/SDH elements
@@ -99,7 +129,7 @@ class Subtitle:
                 if speaker_name:  # Only adds if something remains after cleaning
                     self.structure.speakers.add(speaker_name)
 
-            if RegexPatterns.LEADING_DASHES.match(line_stripped):
+            if Patterns.LEADING_DASHES.match(line_stripped):
                 self.structure.has_dashes = True
 
 
@@ -109,81 +139,86 @@ class TextCleaner:
     @staticmethod
     def clean_subtitle(subtitle: Subtitle) -> Subtitle:
         """Executes all cleaning steps on a complete subtitle."""
-        # Creates a copy to avoid modifying the original
-        cleaned_subtitle = copy.deepcopy(subtitle)
+        return TextCleaner.clean_subtitle_interactive(
+            TextCleaner.clean_subtitle_auto(subtitle)
+        )
 
-        # Applies content removal on the full text (multiline-aware)
-        full_text = subtitle.text
-        full_text = TextCleaner._remove_parentheses_content(full_text)
-        full_text = TextCleaner._remove_bracket_content(full_text)
-        full_text = TextCleaner._remove_curly_bracket_content(full_text)
-        full_text = TextCleaner._remove_hash_symbol_content(full_text)
-        full_text = TextCleaner._remove_music_indication(full_text)
-        full_text = TextCleaner._fix_double_hyphens(full_text)
-        full_text = TextCleaner._fix_lengthy_ellipsis(full_text)
+    @staticmethod
+    def clean_subtitle_auto(subtitle: Subtitle) -> Subtitle:
+        """Applies AUTO-mode cleaning steps without requiring user review."""
+        cleaned = copy.deepcopy(subtitle)
+        text = TextCleaner._fix_lengthy_ellipsis(subtitle.text)
+        text = TextCleaner._final_cleanup(text)
+        cleaned.text = text
+        cleaned.lines = text.split("\n")
+        return cleaned
 
-        # Applies per-line cleaning steps (speaker identification)
+    @staticmethod
+    def clean_subtitle_interactive(subtitle: Subtitle) -> Subtitle:
+        """Applies INTERACTIVE-mode cleaning steps that require user review."""
+        cleaned = copy.deepcopy(subtitle)
+
+        text = subtitle.text
+        text = TextCleaner._remove_parentheses_content(text)
+        text = TextCleaner._remove_bracket_content(text)
+        text = TextCleaner._remove_curly_bracket_content(text)
+        text = TextCleaner._remove_hash_symbol_content(text)
+        text = TextCleaner._remove_music_indication(text)
+        text = TextCleaner._fix_double_hyphens(text)
+
         cleaned_lines = []
-        for line in full_text.split("\n"):
-            cleaned_line = TextCleaner._remove_speaker_identification(line)
-            cleaned_line = cleaned_line.strip()
-            if cleaned_line:  # Keeps only non-empty lines
-                cleaned_lines.append(cleaned_line)
+        for line in text.split("\n"):
+            line = TextCleaner._remove_speaker_identification(line).strip()
+            if line:
+                cleaned_lines.append(line)
 
-        # Joins the cleaned lines
-        cleaned_text = "\n".join(cleaned_lines)
+        text = TextCleaner._format_structure(subtitle, "\n".join(cleaned_lines))
+        text = TextCleaner._final_cleanup(text)
 
-        # Applies structural formatting based on analysis
-        cleaned_text = TextCleaner._format_structure(subtitle, cleaned_text)
-
-        # Final cleanup
-        cleaned_text = TextCleaner._final_cleanup(cleaned_text)
-
-        cleaned_subtitle.text = cleaned_text
-        cleaned_subtitle.lines = cleaned_text.split("\n")
-
-        return cleaned_subtitle
+        cleaned.text = text
+        cleaned.lines = text.split("\n")
+        return cleaned
 
     @staticmethod
     def _remove_parentheses_content(text: str) -> str:
         """Removes content between parentheses."""
-        return RegexPatterns.PARENTHESES.sub("", text)
+        return Patterns.PARENTHESES.sub("", text)
 
     @staticmethod
     def _remove_bracket_content(text: str) -> str:
         """Removes content between brackets."""
-        return RegexPatterns.BRACKETS.sub("", text)
+        return Patterns.BRACKETS.sub("", text)
 
     @staticmethod
     def _remove_curly_bracket_content(text: str) -> str:
         """Removes content between curly brackets."""
-        return RegexPatterns.CURLY_BRACKETS.sub("", text)
+        return Patterns.CURLY_BRACKETS.sub("", text)
 
     @staticmethod
     def _remove_hash_symbol_content(text: str) -> str:
         """Removes content between hash symbols."""
-        return RegexPatterns.HASH.sub("", text)
+        return Patterns.HASH.sub("", text)
 
     @staticmethod
     def _remove_music_indication(text: str) -> str:
         """Removes musical indication symbols."""
-        return RegexPatterns.MUSIC_SIGN.sub("", text)
+        return Patterns.MUSIC_SIGN.sub("", text)
 
     @staticmethod
     def _fix_double_hyphens(text: str) -> str:
         """Replaces double hyphens with em dash."""
-        return RegexPatterns.DOUBLE_HYPHENS.sub("\u2014", text)
+        return Patterns.DOUBLE_HYPHENS.sub("\u2014", text)
 
     @staticmethod
     def _fix_lengthy_ellipsis(text: str) -> str:
         """Replaces sequences of more than 3 dots with exactly 3 dots."""
-        return RegexPatterns.LENGTHY_ELLIPSIS.sub("...", text)
+        return Patterns.LENGTHY_ELLIPSIS.sub("...", text)
 
     @staticmethod
     def _remove_speaker_identification(text: str) -> str:
         """Removes speaker identification."""
         # Removes only at the beginning of the line to avoid removing dialogues
-        return RegexPatterns.SPEAKER.sub("", text)
+        return Patterns.SPEAKER.sub("", text)
 
     @staticmethod
     def _format_structure(subtitle: Subtitle, cleaned_text: str) -> str:
@@ -200,7 +235,7 @@ class TextCleaner:
             or
             # Has dashes after cleaning
             any(
-                RegexPatterns.LEADING_DASHES.match(line.strip())
+                Patterns.LEADING_DASHES.match(line.strip())
                 for line in cleaned_lines
                 if line.strip()
             )
@@ -218,7 +253,7 @@ class TextCleaner:
                 continue
 
             # Removes any residual dash for consistent reformatting
-            cleaned = RegexPatterns.LEADING_DASHES.sub("", stripped)
+            cleaned = Patterns.LEADING_DASHES.sub("", stripped)
 
             if cleaned:
                 formatted_lines.append(f"-{cleaned}")
@@ -252,10 +287,10 @@ class TextCleaner:
         cleaned_lines = []
 
         for line in lines:
-            line = RegexPatterns.MULTIPLE_SPACES.sub(" ", line)
+            line = Patterns.MULTIPLE_SPACES.sub(" ", line)
             line = line.strip()
             line = re.sub(r"([\-\–\—])\s+", r"\1", line)
-            line = RegexPatterns.SPACES_BEFORE_PUNCTUATION.sub(r"\1", line)
+            line = Patterns.SPACES_BEFORE_PUNCTUATION.sub(r"\1", line)
             if line:
                 cleaned_lines.append(line)
 
@@ -365,18 +400,31 @@ class SubtitleCleaner:
         print(f"\nAnalyzing {len(self.subtitles)} subtitles...")
         print("=" * 60)
 
-        pending = [
-            (i, subtitle, cleaned)
-            for i, subtitle in enumerate(self.subtitles)
-            if (cleaned := self.text_cleaner.clean_subtitle(subtitle)).text
-            != subtitle.text
+        all_processed = []
+        for i, subtitle in enumerate(self.subtitles):
+            auto = self.text_cleaner.clean_subtitle_auto(subtitle)
+            fully = self.text_cleaner.clean_subtitle_interactive(auto)
+            all_processed.append((i, subtitle, auto, fully))
+
+        auto_changes = [
+            (subtitle, auto)
+            for _, subtitle, auto, fully in all_processed
+            if auto.text != subtitle.text and fully.text == auto.text
         ]
 
-        for count, (i, subtitle, cleaned_subtitle) in enumerate(pending, 1):
+        pending = [
+            (i, subtitle, auto, fully)
+            for i, subtitle, auto, fully in all_processed
+            if fully.text != auto.text
+        ]
+
+        changes_made.extend(auto_changes)
+
+        for count, (i, subtitle, auto_sub, cleaned_subtitle) in enumerate(pending, 1):
             print(
                 f"\n-------------- Subtitle #{subtitle.number} ({count}/{len(pending)}) --------------"
             )
-            print(subtitle.text)
+            print(auto_sub.text)
 
             # Determine if the correction results in empty text
             will_remove = not cleaned_subtitle.text.strip()
@@ -410,12 +458,14 @@ class SubtitleCleaner:
                     changes_made.append((subtitle, cleaned_subtitle))
                     print("✓ Correction accepted")
             elif choice == "2":
+                if auto_sub.text != subtitle.text:
+                    changes_made.append((subtitle, auto_sub))
                 print("✓ Kept original")
             elif choice == "3":
                 subtitles_to_remove.append(i)
                 print("✓ Subtitle marked for removal")
             elif choice == "4":
-                new_text = self._prompt_edit_lines(subtitle.lines)
+                new_text = self._prompt_edit_lines(auto_sub.lines)
                 if new_text:
                     new_subtitle = copy.deepcopy(subtitle)
                     new_subtitle.text = new_text
@@ -426,6 +476,17 @@ class SubtitleCleaner:
                     print("✗ Empty text, keeping original")
             else:
                 print("✓ Kept original (invalid option)")
+
+        if auto_changes:
+            print(f"\n{'=' * 60}")
+            print(f"AUTO-APPLIED CHANGES ({len(auto_changes)})")
+            print(f"{'=' * 60}")
+            for original, auto in auto_changes:
+                print(f"\n-------------- Subtitle #{original.number} --------------")
+                print(original.text)
+                print(f"\n-----------------------------------------")
+                print(auto.text)
+                print(f"-----------------------------------------")
 
         if changes_made or subtitles_to_remove:
             self.apply_changes(changes_made, subtitles_to_remove)
