@@ -136,6 +136,33 @@ class Subtitle:
 class TextCleaner:
     """Text cleaning pipeline with sequential steps."""
 
+    # Registry mapping patterns to their text-level cleaning functions.
+    # Order matters: cleaners are applied sequentially.
+    _TEXT_CLEANERS: List[Tuple["Pattern", "staticmethod"]] = []
+
+    @classmethod
+    def _get_text_cleaners(cls) -> List[Tuple[Pattern, callable]]:
+        """Returns the registry of (pattern, cleaner_function) pairs."""
+        if not cls._TEXT_CLEANERS:
+            cls._TEXT_CLEANERS = [
+                (Patterns.PARENTHESES, cls._remove_parentheses_content),
+                (Patterns.BRACKETS, cls._remove_bracket_content),
+                (Patterns.CURLY_BRACKETS, cls._remove_curly_bracket_content),
+                (Patterns.HASH, cls._remove_hash_symbol_content),
+                (Patterns.MUSIC_SIGN, cls._remove_music_indication),
+                (Patterns.DOUBLE_HYPHENS, cls._fix_double_hyphens),
+                (Patterns.LENGTHY_ELLIPSIS, cls._fix_lengthy_ellipsis),
+            ]
+        return cls._TEXT_CLEANERS
+
+    @classmethod
+    def _apply_cleaners_by_mode(cls, text: str, mode: PatternMode) -> str:
+        """Applies all text-level cleaners matching the given mode."""
+        for pattern, cleaner in cls._get_text_cleaners():
+            if pattern.mode == mode:
+                text = cleaner(text)
+        return text
+
     @staticmethod
     def clean_subtitle(subtitle: Subtitle) -> Subtitle:
         """Executes all cleaning steps on a complete subtitle."""
@@ -143,37 +170,32 @@ class TextCleaner:
             TextCleaner.clean_subtitle_auto(subtitle)
         )
 
-    @staticmethod
-    def clean_subtitle_auto(subtitle: Subtitle) -> Subtitle:
+    @classmethod
+    def clean_subtitle_auto(cls, subtitle: Subtitle) -> Subtitle:
         """Applies AUTO-mode cleaning steps without requiring user review."""
         cleaned = copy.deepcopy(subtitle)
-        text = TextCleaner._fix_lengthy_ellipsis(subtitle.text)
-        text = TextCleaner._final_cleanup(text)
+        text = cls._apply_cleaners_by_mode(subtitle.text, PatternMode.AUTO)
+        text = cls._final_cleanup(text)
         cleaned.text = text
         cleaned.lines = text.split("\n")
         return cleaned
 
-    @staticmethod
-    def clean_subtitle_interactive(subtitle: Subtitle) -> Subtitle:
+    @classmethod
+    def clean_subtitle_interactive(cls, subtitle: Subtitle) -> Subtitle:
         """Applies INTERACTIVE-mode cleaning steps that require user review."""
         cleaned = copy.deepcopy(subtitle)
 
-        text = subtitle.text
-        text = TextCleaner._remove_parentheses_content(text)
-        text = TextCleaner._remove_bracket_content(text)
-        text = TextCleaner._remove_curly_bracket_content(text)
-        text = TextCleaner._remove_hash_symbol_content(text)
-        text = TextCleaner._remove_music_indication(text)
-        text = TextCleaner._fix_double_hyphens(text)
+        text = cls._apply_cleaners_by_mode(subtitle.text, PatternMode.INTERACTIVE)
 
         cleaned_lines = []
         for line in text.split("\n"):
-            line = TextCleaner._remove_speaker_identification(line).strip()
+            if Patterns.SPEAKER.mode == PatternMode.INTERACTIVE:
+                line = cls._remove_speaker_identification(line).strip()
             if line:
                 cleaned_lines.append(line)
 
-        text = TextCleaner._format_structure(subtitle, "\n".join(cleaned_lines))
-        text = TextCleaner._final_cleanup(text)
+        text = cls._format_structure(subtitle, "\n".join(cleaned_lines))
+        text = cls._final_cleanup(text)
 
         cleaned.text = text
         cleaned.lines = text.split("\n")
