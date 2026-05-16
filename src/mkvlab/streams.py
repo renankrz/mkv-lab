@@ -1,51 +1,42 @@
 #!/usr/bin/env python3
 """
-Lists stream information from media files using FFmpeg.
+Print the stream lines from an ``ffmpeg`` probe of a single media file.
 """
 
-import os
-import subprocess
+from __future__ import annotations
+
+import argparse
 import sys
+from pathlib import Path
+
+from .ffmpeg import ensure_ffmpeg_toolchain, list_streams_text
 
 
-def streams(filename):
-    # Check if the file exists
-    if not os.path.isfile(filename):
-        print(f"Error: The file '{filename}' was not found in the current directory.")
+def show_streams(path: Path) -> int:
+    """Print every line containing ``Stream`` from ffmpeg's banner output."""
+    if not path.is_file():
+        print(f"Error: The file '{path}' was not found.")
         return 1
 
-    # Build the command
-    command = ["ffmpeg", "-hide_banner", "-i", filename]
-
-    try:
-        # Run the command and capture the output
-        result = subprocess.run(command, stderr=subprocess.PIPE, text=True)
-
-        # Filter lines containing "Stream"
-        for line in result.stderr.split("\n"):
-            if "Stream" in line:
-                print(line)
-
-        return 0
-    except FileNotFoundError:
-        print(
-            "Error: The command 'ffmpeg' was not found. Make sure FFmpeg is installed."
-        )
-        return 1
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return 1
+    for line in list_streams_text(path):
+        print(line)
+    return 0
 
 
-def main():
-    script_name = os.path.basename(sys.argv[0])
-    if len(sys.argv) != 2:
-        print(f"Usage: {script_name} <file>")
-        print(f"Example: {script_name} S01E10.mkv")
-        sys.exit(1)
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="List stream information from a media file",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s S01E10.mkv
+        """,
+    )
+    parser.add_argument("file", help="Path to the media file to inspect")
+    args = parser.parse_args()
 
-    filename = sys.argv[1]
-    sys.exit(streams(filename))
+    ensure_ffmpeg_toolchain(require_ffprobe=False)
+    sys.exit(show_streams(Path(args.file)))
 
 
 if __name__ == "__main__":

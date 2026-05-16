@@ -1,97 +1,63 @@
 #!/usr/bin/env python3
 """
-Converts MP4+SRT pairs to MKV with embedded subtitles.
+Convert MP4 + SRT pairs into MKV files with an embedded English subtitle stream.
 """
+
+from __future__ import annotations
 
 import argparse
 import subprocess
 import sys
 from pathlib import Path
 
+from .ffmpeg import embed_external_srt, ensure_ffmpeg_toolchain
 
-def process_files(input_dir, output_dir):
-    """Processes MP4 and SRT files from the input directory and saves them in the output directory"""
-    input_path = Path(input_dir)
-    output_path = Path(output_dir)
 
-    # Input directory validation
-    if not input_path.exists() or not input_path.is_dir():
+def process_directory(input_dir: Path, output_dir: Path) -> bool:
+    """Mux every ``*.mp4`` in ``input_dir`` with its sibling ``*.srt``.
+
+    Returns ``True`` when *all* files were converted successfully.
+    """
+    if not input_dir.exists() or not input_dir.is_dir():
         print(f"Error: Input directory '{input_dir}' does not exist or is invalid.")
         sys.exit(1)
 
-    # Create output directory
-    if not output_path.exists():
-        output_path.mkdir(parents=True, exist_ok=True)
-    elif not output_path.is_dir():
+    if output_dir.exists() and not output_dir.is_dir():
         print(f"Error: Output path '{output_dir}' is not a valid directory.")
         sys.exit(1)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Find MP4 files
-    mp4_files = list(input_path.glob("*.mp4"))
-    mp4_files.sort()
-
+    mp4_files = sorted(input_dir.glob("*.mp4"))
     if not mp4_files:
         print("No MP4 files found in the input directory.")
         return False
 
-    success_count = 0
-    total_files = len(mp4_files)
+    print(f"Processing {len(mp4_files)} MP4 file(s)...")
 
-    print(f"Processing {total_files} MP4 file(s)...")
-
-    for i, mp4_file in enumerate(mp4_files, 1):
-        # Corresponding SRT file
+    success = 0
+    for i, mp4_file in enumerate(mp4_files, start=1):
         srt_file = mp4_file.with_suffix(".srt")
-
         if not srt_file.exists():
             print(f"{i}. Warning: SRT not found for {mp4_file.name}")
             continue
 
-        # Output MKV file
-        mkv_file = output_path / mp4_file.with_suffix(".mkv").name
-
-        # FFmpeg command
-        command = [
-            "ffmpeg",
-            "-i",
-            str(mp4_file),
-            "-i",
-            str(srt_file),
-            "-map",
-            "0",
-            "-map",
-            "1",
-            "-c",
-            "copy",
-            "-c:s",
-            "srt",
-            "-metadata:s:s:0",
-            "language=en",
-            "-metadata:s:s:0",
-            "title=EN",
-            "-disposition:s:0",
-            "default",
-            "-y",
-            str(mkv_file),
-        ]
-
+        mkv_file = output_dir / mp4_file.with_suffix(".mkv").name
         try:
-            subprocess.run(command, capture_output=True, text=True, check=True)
+            embed_external_srt(
+                mp4_file, srt_file, mkv_file, language="en", default=True
+            )
             print(f"{i}. {mkv_file.name} [OK]")
-            success_count += 1
+            success += 1
+        except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or "").strip() if isinstance(exc.stderr, str) else ""
+            print(f"{i}. Error processing {mp4_file.name}: {stderr}")
 
-        except subprocess.CalledProcessError as e:
-            print(f"{i}. Error processing {mp4_file.name}: {e.stderr.strip()}")
-        except FileNotFoundError:
-            print("Error: FFmpeg not found. Install with: sudo apt install ffmpeg")
-            sys.exit(1)
-
-    return success_count == total_files
+    return success == len(mp4_files)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Convert MP4+SRT pairs to MKV with embedded subtitles",
+        description="Convert MP4+SRT pairs to MKV with an embedded English subtitle stream",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -99,13 +65,17 @@ Examples:
   %(prog)s . ./output
         """,
     )
-
-    parser.add_argument("input_dir", help="Input directory with MP4 and SRT files")
-    parser.add_argument("output_dir", help="Output directory for MKV files")
-
+    parser.add_argument(
+        "input_dir", help="Input directory containing MP4 and SRT files"
+    )
+    parser.add_argument(
+        "output_dir", help="Output directory for the resulting MKV files"
+    )
     args = parser.parse_args()
 
-    if process_files(args.input_dir, args.output_dir):
+    ensure_ffmpeg_toolchain(require_ffprobe=False)
+
+    if process_directory(Path(args.input_dir), Path(args.output_dir)):
         print("Conversion completed successfully!")
     else:
         print("Conversion completed with errors.")

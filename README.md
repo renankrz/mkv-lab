@@ -45,5 +45,9 @@ pip install -r requirements.txt
 ## Project Structure
 
 - `src/mkvlab/` — Main package (CLI + all commands)
+  - `ffmpeg/` — Typed wrappers around `ffmpeg` / `ffprobe`
+    - `languages.py` — Language-code catalog
+    - `dependencies.py` — Runtime checks for the `ffmpeg`/`ffprobe` binaries
+    - `probe.py` — `ffprobe` wrappers + stream selectors
+    - `mux.py` — `ffmpeg` wrappers (extract, mux, remux, filter)
 - `test/` — Unit tests
-- `scripts-misc/` — Utility scripts not related to MKV (rename, upper, frag)

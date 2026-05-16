@@ -1,102 +1,62 @@
 #!/usr/bin/env python3
 """
-Replaces subtitle streams in MKV files with a corresponding SRT file.
+Replace every subtitle stream in MKV files with a sibling SRT file.
 """
+
+from __future__ import annotations
 
 import argparse
 import subprocess
 import sys
 from pathlib import Path
 
+from .ffmpeg import ensure_ffmpeg_toolchain, replace_subtitle_streams
 
-def process_files(input_dir, output_dir):
-    """Processes MKV and SRT files from the input directory and saves them in the output directory"""
-    input_path = Path(input_dir)
-    output_path = Path(output_dir)
 
-    # Input directory validation
-    if not input_path.exists() or not input_path.is_dir():
+def process_directory(input_dir: Path, output_dir: Path) -> bool:
+    """Re-mux every ``*.mkv`` in ``input_dir``, replacing its subtitles with
+    the sibling ``.srt`` file. Returns ``True`` on full success.
+    """
+    if not input_dir.exists() or not input_dir.is_dir():
         print(f"Error: Input directory '{input_dir}' does not exist or is invalid.")
         sys.exit(1)
 
-    # Create output directory
-    if not output_path.exists():
-        output_path.mkdir(parents=True, exist_ok=True)
-    elif not output_path.is_dir():
+    if output_dir.exists() and not output_dir.is_dir():
         print(f"Error: Output path '{output_dir}' is not a valid directory.")
         sys.exit(1)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Find MKV files
-    mkv_files = list(input_path.glob("*.mkv"))
-    mkv_files.sort()
-
+    mkv_files = sorted(input_dir.glob("*.mkv"))
     if not mkv_files:
         print("No MKV files found in the input directory.")
         return False
 
-    success_count = 0
-    total_files = len(mkv_files)
+    print(f"Processing {len(mkv_files)} MKV file(s)...")
 
-    print(f"Processing {total_files} MKV file(s)...")
-
-    for i, mkv_file in enumerate(mkv_files, 1):
-        # Corresponding SRT file
+    success = 0
+    for i, mkv_file in enumerate(mkv_files, start=1):
         srt_file = mkv_file.with_suffix(".srt")
-
         if not srt_file.exists():
             print(f"{i}. Warning: SRT not found for {mkv_file.name}")
             continue
 
-        # Output MKV file
-        out_file = output_path / mkv_file.name
-
-        # FFmpeg command:
-        #   -map 0        — include all streams from the input MKV
-        #   -map -0:s     — then exclude all subtitle streams from it
-        #   -map 1:s      — add the subtitle stream from the SRT file
-        command = [
-            "ffmpeg",
-            "-i",
-            str(mkv_file),
-            "-i",
-            str(srt_file),
-            "-map",
-            "0",
-            "-map",
-            "-0:s",
-            "-map",
-            "1:s",
-            "-c",
-            "copy",
-            "-c:s",
-            "srt",
-            "-metadata:s:s:0",
-            "language=en",
-            "-metadata:s:s:0",
-            "title=EN",
-            "-disposition:s:0",
-            "default",
-            "-y",
-            str(out_file),
-        ]
-
+        out_file = output_dir / mkv_file.name
         try:
-            subprocess.run(command, capture_output=True, text=True, check=True)
+            replace_subtitle_streams(
+                mkv_file, srt_file, out_file, language="en", default=True
+            )
             print(f"{i}. {out_file.name} [OK]")
-            success_count += 1
+            success += 1
+        except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or "").strip() if isinstance(exc.stderr, str) else ""
+            print(f"{i}. Error processing {mkv_file.name}: {stderr}")
 
-        except subprocess.CalledProcessError as e:
-            print(f"{i}. Error processing {mkv_file.name}: {e.stderr.strip()}")
-        except FileNotFoundError:
-            print("Error: FFmpeg not found. Install with: sudo apt install ffmpeg")
-            sys.exit(1)
-
-    return success_count == total_files
+    return success == len(mkv_files)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Replace subtitle streams in MKV files with a corresponding SRT",
+        description="Replace subtitle streams in MKV files with a sibling SRT",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -104,15 +64,17 @@ Examples:
   %(prog)s . ./output
         """,
     )
-
-    parser.add_argument("input_dir", help="Input directory with MKV and SRT files")
+    parser.add_argument(
+        "input_dir", help="Input directory containing MKV and SRT files"
+    )
     parser.add_argument(
         "output_dir", help="Output directory for the processed MKV files"
     )
-
     args = parser.parse_args()
 
-    if process_files(args.input_dir, args.output_dir):
+    ensure_ffmpeg_toolchain(require_ffprobe=False)
+
+    if process_directory(Path(args.input_dir), Path(args.output_dir)):
         print("Processing completed successfully!")
     else:
         print("Processing completed with errors.")
