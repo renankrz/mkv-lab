@@ -36,6 +36,7 @@ mkvlab track-filter [--pt] [--en] [--default=pt|en] [--audio=pt|en|jp] <input_di
 
 - Python 3.10+
 - FFmpeg and FFprobe (for video/subtitle processing)
+- [`srt`](https://pypi.org/project/srt/) (installed automatically as a runtime dependency; used by `fix-cc` for SRT parsing/serialization)
 - pytest (for running unit tests)
 
 ```bash

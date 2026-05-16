@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
 """
 Interactively cleans CC/SDH elements from SRT subtitles.
+
+SRT I/O is delegated to the `srt` package; this module owns only the
+domain model (`Subtitle`, `SubtitleStructure`), the cleaning pipeline
+(`TextCleaner`) and the interactive CLI (`SubtitleCleaner`).
 """
 
 import copy
 import re
 import sys
 from dataclasses import dataclass, field
+from datetime import timedelta
 from enum import Enum
 from enum import auto as enum_auto
 from pathlib import Path
 from typing import List, Optional, Set, Tuple
+
+import srt
 
 
 class PatternMode(Enum):
@@ -83,7 +90,13 @@ class SubtitleStructure:
 
 @dataclass
 class Subtitle:
-    """Complete representation of a subtitle."""
+    """Complete representation of a subtitle.
+
+    This is the project's domain model. It adapts to/from `srt.Subtitle`
+    via :meth:`from_srt` and :meth:`to_srt`, keeping timestamps as plain
+    SRT strings (``HH:MM:SS,mmm``) for ergonomic comparison in tests
+    and printing.
+    """
 
     number: int
     start_time: str
@@ -100,6 +113,35 @@ class Subtitle:
             self.original_text = self.text
         # Analyze the structure of the subtitle
         self._analyze_structure()
+
+    # ---- srt-package adapters -------------------------------------------------
+
+    @classmethod
+    def from_srt(cls, sub: srt.Subtitle) -> "Subtitle":
+        """Builds a domain `Subtitle` from a `srt.Subtitle`."""
+        return cls(
+            number=sub.index,
+            start_time=srt.timedelta_to_srt_timestamp(sub.start),
+            end_time=srt.timedelta_to_srt_timestamp(sub.end),
+            text=sub.content,
+        )
+
+    def to_srt(self) -> srt.Subtitle:
+        """Converts this subtitle back into a `srt.Subtitle`."""
+        return srt.Subtitle(
+            index=self.number,
+            start=(
+                srt.srt_timestamp_to_timedelta(self.start_time)
+                if self.start_time
+                else timedelta(0)
+            ),
+            end=(
+                srt.srt_timestamp_to_timedelta(self.end_time)
+                if self.end_time
+                else timedelta(0)
+            ),
+            content=self.text,
+        )
 
     def _analyze_structure(self):
         """Analyzes the structure of the subtitle for decision making."""
@@ -323,85 +365,34 @@ class SubtitleCleaner:
     def __init__(self, file_path: str):
         self.file_path = file_path
         self.subtitles: List[Subtitle] = []
-        self.original_content: List[str] = []
         self.text_cleaner = TextCleaner()
 
     def load_subtitles(self) -> bool:
-        """Loads the content of the SRT file."""
-        try:
-            with open(self.file_path, "r", encoding="utf-8") as file:
-                self.original_content = file.readlines()
-            return True
-        except UnicodeDecodeError:
+        """Reads and parses the SRT file using the `srt` package.
+
+        Tries UTF-8 first (transparently handling BOM via ``utf-8-sig``)
+        and falls back to ``latin-1`` for legacy files.
+        """
+        path = Path(self.file_path)
+        for encoding in ("utf-8-sig", "latin-1"):
             try:
-                with open(self.file_path, "r", encoding="latin-1") as file:
-                    self.original_content = file.readlines()
-                return True
+                raw = path.read_text(encoding=encoding)
+                break
+            except UnicodeDecodeError:
+                continue
             except Exception as e:
                 print(f"Error reading file: {e}")
                 return False
-        except Exception as e:
-            print(f"Error reading file: {e}")
+        else:
+            print("Error reading file: could not decode with utf-8 or latin-1")
             return False
 
-    def parse_subtitles(self):
-        """Parses the content of the SRT file into Subtitle objects."""
-        current_number = 0
-        current_start = ""
-        current_end = ""
-        current_text_lines = []
-
-        i = 0
-        while i < len(self.original_content):
-            line = self.original_content[i].rstrip("\n\r")
-
-            if not line.strip():
-                if current_number > 0 and current_text_lines:
-                    text = "\n".join(current_text_lines)
-                    subtitle = Subtitle(
-                        number=current_number,
-                        start_time=current_start,
-                        end_time=current_end,
-                        text=text,
-                        lines=current_text_lines.copy(),
-                    )
-                    self.subtitles.append(subtitle)
-                    current_text_lines = []
-                    current_number = 0
-
-                i += 1
-                continue
-
-            if line.isdigit() and not current_text_lines:
-                current_number = int(line)
-                i += 1
-                continue
-
-            if "-->" in line and current_number > 0:
-                times = line.split("-->")
-                if len(times) == 2:
-                    current_start = times[0].strip()
-                    current_end = times[1].strip()
-                i += 1
-                continue
-
-            if current_number > 0:
-                current_text_lines.append(line)
-                i += 1
-                continue
-
-            i += 1
-
-        if current_number > 0 and current_text_lines:
-            text = "\n".join(current_text_lines)
-            subtitle = Subtitle(
-                number=current_number,
-                start_time=current_start,
-                end_time=current_end,
-                text=text,
-                lines=current_text_lines.copy(),
-            )
-            self.subtitles.append(subtitle)
+        try:
+            self.subtitles = [Subtitle.from_srt(s) for s in srt.parse(raw)]
+        except srt.SRTParseError as e:
+            print(f"Error parsing SRT: {e}")
+            return False
+        return True
 
     @staticmethod
     def _prompt_edit_lines(lines: List[str]) -> str:
@@ -520,7 +511,11 @@ class SubtitleCleaner:
     def apply_changes(
         self, changes: List[Tuple[Subtitle, Subtitle]], to_remove: List[int]
     ):
-        """Apply changes by creating a new SRT file."""
+        """Apply changes by rewriting the SRT file via the `srt` package.
+
+        A ``.backup`` of the original file is kept; on failure it is
+        automatically restored.
+        """
         backup_path = self.file_path + ".backup"
         Path(self.file_path).rename(backup_path)
 
@@ -532,23 +527,16 @@ class SubtitleCleaner:
             for i in sorted(to_remove, reverse=True):
                 if i < len(self.subtitles):
                     sub_to_remove = self.subtitles[i]
-                    if sub_to_remove.number in subtitle_dict:
-                        del subtitle_dict[sub_to_remove.number]
+                    subtitle_dict.pop(sub_to_remove.number, None)
 
-            final_subtitles = list(subtitle_dict.values())
-            final_subtitles.sort(key=lambda x: x.number)
+            final_subtitles = sorted(subtitle_dict.values(), key=lambda x: x.number)
 
-            for new_number, subtitle in enumerate(final_subtitles, 1):
-                subtitle.number = new_number
+            # Let `srt.compose` handle reindexing and proper formatting.
+            srt_subs = [s.to_srt() for s in final_subtitles]
+            composed = srt.compose(srt_subs, reindex=True, start_index=1)
+            Path(self.file_path).write_text(composed, encoding="utf-8")
 
-            with open(self.file_path, "w", encoding="utf-8") as outfile:
-                for subtitle in final_subtitles:
-                    outfile.write(f"{subtitle.number}\n")
-                    outfile.write(f"{subtitle.start_time} --> {subtitle.end_time}\n")
-                    outfile.write(f"{subtitle.text}\n")
-                    outfile.write("\n")
-
-            print(f"\n✓ Changes applied successfully!")
+            print("\n✓ Changes applied successfully!")
             print(f"✓ Backup saved as: {backup_path}")
             print(f"✓ Subtitles removed: {len(to_remove)}")
             print(f"✓ Subtitles modified: {len(changes)}")
@@ -578,8 +566,6 @@ def main():
     if not cleaner.load_subtitles():
         print("Failed to load file.")
         sys.exit(1)
-
-    cleaner.parse_subtitles()
 
     print("=" * 60)
     print("INTERACTIVE CC/SDH SUBTITLE CLEANING")
