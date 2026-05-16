@@ -37,7 +37,7 @@ def streams(filename):
         return 1
 
 
-if __name__ == "__main__":
+def main():
     script_name = os.path.basename(sys.argv[0])
     if len(sys.argv) != 2:
         print(f"Usage: {script_name} <file>")
@@ -46,3 +46,7 @@ if __name__ == "__main__":
 
     filename = sys.argv[1]
     sys.exit(streams(filename))
+
+
+if __name__ == "__main__":
+    main()

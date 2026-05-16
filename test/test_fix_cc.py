@@ -1,4 +1,4 @@
-from src.fix_cc import Subtitle, TextCleaner
+from mkvlab.fix_cc import Subtitle, TextCleaner
 
 
 class TestSubtitleCleaner:
