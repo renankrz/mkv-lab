@@ -51,4 +51,12 @@ pip install -r requirements.txt
     - `dependencies.py` — Runtime checks for the `ffmpeg`/`ffprobe` binaries
     - `probe.py` — `ffprobe` wrappers + stream selectors
     - `mux.py` — `ffmpeg` wrappers (extract, mux, remux, filter)
-- `test/` — Unit tests
+  - `fix_cc/` — SRT cleaning sub-package, organised as a small pipeline
+    - `model.py` — `Subtitle`, `Proposal`, `Confidence`
+    - `patterns.py` — Compiled regexes shared by the steps
+    - `pipeline.py` — `CleaningStep`, `Decider`, `run_pipeline`
+    - `steps/` — One `CleaningStep` per concern (parentheses, speaker, …)
+    - `interactive.py` — `InteractiveDecider`: per-subtitle user prompt
+    - `srt_io.py` — Thin wrappers around the `srt` package
+    - `cli.py` — `SubtitleSession` + the `main()` entrypoint
+- `test/` — Unit tests (organised by step + pipeline + decider)
